@@ -1,12 +1,24 @@
 import Tasks from "./Tasks.jsx";
 
-function selectedProject({project, onDelete, onAddTask, onDeleteTask, tasks}) {
 
-    const formatedDate = new Date(project.dueDate).toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric'
-    })
+function SelectedProject({project, onDelete, onAddTask, onDeleteTask, tasks}) {
+    if (!project) {
+        return (
+            <div className="w-[35rem] mt-16 text-center text-stone-500">
+                <h2 className="text-xl font-bold">Project not found</h2>
+                <p>Please select a valid project.</p>
+            </div>
+        );
+    }
+
+    const formatedDate = project.dueDate
+        ? new Date(project.dueDate).toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric'
+        })
+        : '';
+
     return (
         <div className="w-[35rem] mt-16">
             <header className="pb-4 mb-4 border-b-2 border-stone-300">
@@ -24,7 +36,7 @@ function selectedProject({project, onDelete, onAddTask, onDeleteTask, tasks}) {
                 tasks={tasks}
             />
         </div>
-    )
+    );
 }
 
-export default selectedProject;
+export default SelectedProject;

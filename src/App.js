@@ -1,4 +1,15 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { db } from './firebase';
+import {
+  collection,
+  addDoc,
+  deleteDoc,
+  doc,
+  onSnapshot,
+  query,
+  where,
+  getDocs
+} from 'firebase/firestore';
 import Sidebar from './components/Sidebar.jsx';
 import NewProject from './components/NewProject.jsx';
 import NoProjectSelected from './components/NoProjectSelected.jsx';
@@ -15,43 +26,53 @@ function App() {
     tasks: [],
   });
 
-  function handleAddTask(text){
-     setProjectState(prevState => {
-      const taskId = Math.random();
-      const newtask = {
-        text: text,
-        projectId : prevState.selectedProjectId,
-        id: taskId,
+  // Fetch projects and tasks from Firestore on mount
+  useEffect(() => {
+    const projectsCol = collection(db, 'projects');
+    const tasksCol = collection(db, 'tasks');
 
-      }
+    const unsubscribeProjects = onSnapshot(projectsCol, (snapshot) => {
+      const loadedProjects = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+      setProjectState(prev => ({ ...prev, projects: loadedProjects }));
+    });
 
-      return {
-        ...prevState,
-        tasks: [newtask, ...prevState.tasks],
-      }
-    })
-  };
+    const unsubscribeTasks = onSnapshot(tasksCol, (snapshot) => {
+      const loadedTasks = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+      setProjectState(prev => ({ ...prev, tasks: loadedTasks }));
+    });
 
-  function handleDeleteTask(id){
-    setProjectState(prevState => {
-      return {
-        ...prevState,
-        // selectedProjectId: undefined,
-        tasks: prevState.tasks.filter(task => task.id !== id),
-      }
-    })
-  };
+    return () => {
+      unsubscribeProjects();
+      unsubscribeTasks();
+    };
+  }, []);
+
+  async function handleAddTask(text) {
+    const task = {
+      text,
+      projectId: projectState.selectedProjectId,
+    };
+    await addDoc(collection(db, 'tasks'), task);
+  }
+
+  async function handleDeleteTask(id) {
+    await deleteDoc(doc(db, 'tasks', id));
+  }
 
 
 
-  function handleDelete() {
-    setProjectState(prevState => {
-      return {
-        ...prevState,
-        projects: prevState.projects.filter(project => project.id !== prevState.selectedProjectId),
-        selectedProjectId: undefined,
-      }
-    })
+  async function handleDelete() {
+    // Delete project
+    const projectId = projectState.selectedProjectId;
+    if (!projectId) return;
+    await deleteDoc(doc(db, 'projects', projectId));
+    // Delete all tasks for this project
+    const q = query(collection(db, 'tasks'), where('projectId', '==', projectId));
+    const querySnapshot = await getDocs(q);
+    for (const taskDoc of querySnapshot.docs) {
+      await deleteDoc(doc(db, 'tasks', taskDoc.id));
+    }
+    setProjectState(prev => ({ ...prev, selectedProjectId: undefined }));
   }
 
 
@@ -82,20 +103,9 @@ function App() {
     })
   }
 
-  function handleAddProject(projectData) {
-    setProjectState(prevState => {
-      const projectId = Math.random();
-      const newProject = {
-        ...projectData,
-        id: projectId,
-      }
-
-      return {
-        ...prevState,
-        projects: [...prevState.projects, newProject],
-        selectedProjectId: undefined,
-      }
-    })
+  async function handleAddProject(projectData) {
+    await addDoc(collection(db, 'projects'), projectData);
+    setProjectState(prev => ({ ...prev, selectedProjectId: undefined }));
   }
 
   const selectedProject = projectState.projects.find(project => project.id === projectState.selectedProjectId);
